@@ -7,6 +7,7 @@ Records 48Khz, 16-bit, stereo WAV files using "arecord".
 Writes WAV files to a directory with a timestamp appended to the prompt id.
 """
 import argparse
+import os
 import re
 import signal
 import subprocess
@@ -142,7 +143,9 @@ def main():
             next_button.config(bg="yellow")
 
             if record_proc:
+                os.kill(record_proc.pid, signal.SIGTERM)
                 record_proc.terminate()
+                record_proc.wait()
                 record_proc = None
 
                 if current_prompt_id and last_wav_path:
