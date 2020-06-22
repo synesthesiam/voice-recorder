@@ -14,6 +14,7 @@ import subprocess
 import threading
 import time
 import tkinter as tk
+import tkinter.messagebox
 import typing
 from pathlib import Path
 from tkinter import ttk
@@ -111,7 +112,7 @@ def main():
             textbox.insert(1.0, prompts[current_prompt_id])
             next_button["state"] = tk.DISABLED
         else:
-            tk.messagebox.showinfo(message="All done :)")
+            tkinter.messagebox.showinfo(message="All done :)")
 
         progress["value"] = 100 * ((total_prompts - len(prompts_left)) / total_prompts)
 
@@ -145,7 +146,9 @@ def main():
             if record_proc:
                 os.kill(record_proc.pid, signal.SIGTERM)
                 record_proc.terminate()
-                record_proc.wait()
+                time.sleep(0.05)
+                subprocess.run(["killall", "-9", "arecord"])
+                # record_proc.wait()
                 record_proc = None
 
                 if current_prompt_id and last_wav_path:
@@ -181,7 +184,7 @@ def main():
                     ]
                 )
             else:
-                tk.messagebox.showinfo(message="No prompt")
+                tkinter.messagebox.showinfo(message="No prompt")
 
     # -------------------------------------------------------------------------
 
