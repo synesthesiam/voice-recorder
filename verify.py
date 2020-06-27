@@ -8,6 +8,7 @@ end. Play and Verify will respect trimmings.
 Change prompt in text box to have different text written with Verify.
 """
 import argparse
+import logging
 import os
 import re
 import shutil
@@ -31,6 +32,8 @@ from scipy.io.wavfile import read as wav_read
 # Directory of this script
 _DIR = Path(__file__).parent
 
+_LOGGER = logging.getLogger("verify")
+
 
 def main():
     """Main entry point."""
@@ -45,6 +48,9 @@ def main():
         "done_dir", help="Directory to move completed WAV files and text prompts to"
     )
     args = parser.parse_args()
+
+    logging.basicConfig(level=logging.DEBUG)
+    _LOGGER.debug(args)
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
@@ -61,7 +67,7 @@ def main():
     for wav_path in input_dir.glob("*.wav"):
         text_path = wav_path.with_suffix(".txt")
         if not text_path.is_file():
-            print("Missing", text_path)
+            _LOGGER.warn("Missing %s", text_path)
             continue
 
         rel_wav_path = wav_path.relative_to(input_dir)
@@ -117,9 +123,11 @@ def main():
 
         if current_path:
             wav_path = input_dir / current_path
+            _LOGGER.debug("Loading %s", wav_path)
             sample_rate, wav_data = wav_read(str(wav_path))
             audio = wav_data[:, 0]
             plot.plot(audio, color="blue")
+            plot.set_xlim(0, len(audio))
 
             # Trim lines
             if left_cut is not None:
@@ -138,6 +146,25 @@ def main():
             # Left click
             left_cut = event.xdata
             redraw()
+        elif (event.button == 2) and current_path:
+            # Middle click
+            wav_path = input_dir / current_path
+            if wav_path and wav_path.is_file():
+                from_sec = event.xdata / sample_rate
+                play_command = [
+                    "play",
+                    "--ignore-length",
+                    str(wav_path),
+                    "trim",
+                    str(from_sec),
+                ]
+
+                if right_cut is not None:
+                    to_sec = right_cut / sample_rate
+                    play_command.append(f"={to_sec}")
+                threading.Thread(
+                    target=lambda: subprocess.check_call(play_command)
+                ).start()
         elif event.button == 3:
             # Right click
             right_cut = event.xdata
@@ -171,12 +198,11 @@ def main():
 
         # Update progress bar
         progress["value"] = 100 * ((total_paths - len(todo_paths)) / total_paths)
-        print(progress["value"])
 
     def do_play(*_args):
         """Play current WAV file"""
         wav_path = input_dir / current_path
-        print(wav_path)
+        _LOGGER.debug("Playing %s", wav_path)
         if wav_path and wav_path.is_file():
             play_command = ["play", "--ignore-length", str(wav_path)]
 
@@ -187,9 +213,9 @@ def main():
 
                 if right_cut is not None:
                     to_sec = right_cut / sample_rate
-                    play_command.append(str(to_sec))
+                    play_command.append(f"={to_sec}")
 
-            print(play_command)
+            _LOGGER.debug(play_command)
             threading.Thread(target=lambda: subprocess.check_call(play_command)).start()
 
     def do_verify(*_args):
@@ -206,9 +232,9 @@ def main():
 
                 if right_cut is not None:
                     to_sec = right_cut / sample_rate
-                    sox_command.append(str(to_sec))
+                    sox_command.append(f"={to_sec}")
 
-            print(sox_command)
+            _LOGGER.debug(sox_command)
             subprocess.check_call(sox_command)
 
             # Write prompt
