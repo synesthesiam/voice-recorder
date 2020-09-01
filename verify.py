@@ -9,12 +9,8 @@ Change prompt in text box to have different text written with Verify.
 """
 import argparse
 import logging
-import os
-import re
-import shutil
 import subprocess
 import threading
-import time
 import tkinter as tk
 import tkinter.messagebox
 import typing
@@ -22,17 +18,20 @@ from pathlib import Path
 from tkinter import ttk
 
 import matplotlib
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+from scipy.io.wavfile import read as wav_read
 
 matplotlib.use("TkAgg")
 
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from scipy.io.wavfile import read as wav_read
 
 # Directory of this script
 _DIR = Path(__file__).parent
 
 _LOGGER = logging.getLogger("verify")
+
+
+# -----------------------------------------------------------------------------
 
 
 def main():
@@ -42,10 +41,8 @@ def main():
         "input_dir", help="Directory with input WAV files and text prompts"
     )
     parser.add_argument(
-        "output_dir", help="Directory to write output WAV files and text prompts to"
-    )
-    parser.add_argument(
-        "done_dir", help="Directory to move completed WAV files and text prompts to"
+        "output_dir",
+        help="Directory to write verified/trimmed WAV files and text prompts to",
     )
     args = parser.parse_args()
 
@@ -56,26 +53,32 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    done_dir = Path(args.done_dir)
-    done_dir.mkdir(parents=True, exist_ok=True)
-
     # -------------------------------------------------------------------------
     # Load WAV files to be verified
     # -------------------------------------------------------------------------
+
+    _LOGGER.debug("Looking for WAV files in %s", input_dir)
 
     todo_prompts: typing.Dict[Path, str] = {}
     for wav_path in input_dir.glob("*.wav"):
         text_path = wav_path.with_suffix(".txt")
         if not text_path.is_file():
-            _LOGGER.warn("Missing %s", text_path)
+            _LOGGER.warning("Missing %s", text_path)
             continue
 
         rel_wav_path = wav_path.relative_to(input_dir)
+        done_wav_path = output_dir / rel_wav_path.name
+        if done_wav_path.is_file():
+            # Skip already completed WAV files
+            continue
+
         todo_prompts[rel_wav_path] = text_path.read_text().strip()
 
     todo_paths = list(sorted(todo_prompts.keys()))
     total_paths = len(todo_paths)
     current_path: typing.Optional[Path] = None
+
+    _LOGGER.debug("Found %s WAV files to verify", len(todo_paths))
 
     # -------------------------------------------------------------------------
     # Verify Samples
@@ -124,7 +127,9 @@ def main():
         if current_path:
             wav_path = input_dir / current_path
             _LOGGER.debug("Loading %s", wav_path)
-            sample_rate, wav_data = wav_read(str(wav_path))
+            wav_sample_rate, wav_data = wav_read(str(wav_path))
+            sample_rate = wav_sample_rate
+
             audio = wav_data[:, 0]
             plot.plot(audio, color="blue")
             plot.set_xlim(0, len(audio))
@@ -197,7 +202,13 @@ def main():
             path_label["text"] = ""
 
         # Update progress bar
-        progress["value"] = 100 * ((total_paths - len(todo_paths)) / total_paths)
+        if total_paths > 0:
+            progress["value"] = 100 * ((total_paths - len(todo_paths)) / total_paths)
+
+        verify_button["text"] = f"Verify ({len(todo_paths)})"
+
+        verify_button.config(bg="#F0F0F0")
+        play_button.config(bg="yellow")
 
     def do_play(*_args):
         """Play current WAV file"""
@@ -217,6 +228,8 @@ def main():
 
             _LOGGER.debug(play_command)
             threading.Thread(target=lambda: subprocess.check_call(play_command)).start()
+            play_button.config(bg="green")
+            verify_button.config(bg="yellow")
 
     def do_verify(*_args):
         """Verify recording."""
@@ -241,34 +254,28 @@ def main():
             prompt_path = output_dir / current_path.with_suffix(".txt")
             prompt_path.write_text(textbox.get(1.0, tk.END).strip())
 
-            # Move completed WAV file
-            done_path = done_dir / current_path
-            shutil.move(input_path, done_path)
-
-            # Move completed prompt
-            input_prompt_path = input_dir / current_path.with_suffix(".txt")
-            if input_prompt_path.is_file():
-                done_prompt_path = done_dir / current_path.with_suffix(".txt")
-                shutil.move(input_prompt_path, done_prompt_path)
-
             do_next()
         else:
             tkinter.messagebox.showinfo(message="No prompt")
 
     # -------------------------------------------------------------------------
 
-    bottom_frame = tk.Frame(window).pack()
+    bottom_frame = tk.Frame(window)
+    bottom_frame.pack(fill=tk.BOTH, padx=10, pady=10)
 
+    # Button to skip WAV file
     skip_button = tk.Button(bottom_frame, text="Skip", command=do_next)
     skip_button.config(bg="white", activebackground="red", font=("Courier", 20))
     skip_button.pack(side="left", padx=10, pady=10)
 
+    # Button to confirm WAV file
     verify_button = tk.Button(bottom_frame, text="Verify", command=do_verify)
     verify_button.config(
         activebackground="green", activeforeground="white", font=("Courier", 20)
     )
     verify_button.pack(side="right", padx=10, pady=10)
 
+    # Button to play back WAV file
     play_button = tk.Button(bottom_frame, text="Play", command=do_play)
     play_button.config(font=("Courier", 20))
     play_button.pack(side="right", padx=10, pady=10)
