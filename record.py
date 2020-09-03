@@ -37,8 +37,22 @@ _RECORDING_DONE = threading.Event()
 _RECORDING_PATH = None
 
 _SAMPLE_RATE = 48000  # Hertz
-_SAMPLE_WIDTH = 2  # bytes
+_SAMPLE_WIDTH_BYTES = 2  # bytes
+_SAMPLE_WIDTH_BITS = _SAMPLE_WIDTH_BYTES * 8
 _SAMPLE_CHANNELS = 2
+
+# Format strings for common recording commands.
+# Referenced by name with --record-command argument.
+# Overridden when not one of these names.
+_RECORD_COMMANDS = {
+    "arecord": "arecord -q -r {rate} -f S16_LE -c {channels} -D '{device}' -t raw",
+    "sox": "rec -q -r {rate} -b {width_bits} -c {channels} -t raw -",
+}
+
+# Format strings for common playback commands.
+# Referenced by name with --play-command argument.
+# Overridden when not one of these names.
+_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "play -q '{path}'"}
 
 # -----------------------------------------------------------------------------
 
@@ -46,9 +60,23 @@ _SAMPLE_CHANNELS = 2
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", help="Name of ALSA recording device")
+    parser.add_argument(
+        "--device", default="default", help="Name of ALSA recording device"
+    )
     parser.add_argument("--prompts", help="File with prompts (CMU Arctic format)")
     parser.add_argument("--wav", help="Directory to store WAV files")
+    parser.add_argument(
+        "--record-command",
+        default="arecord",
+        help="arecord, sox, or format string for recording command. "
+        + "Takes {rate}, {width_bytes}, {width_bits}, {channles}, and {device}",
+    )
+    parser.add_argument(
+        "--play-command",
+        default="aplay",
+        help="aplay, sox, or format string for playback command. "
+        + "Takes {path} for WAV file",
+    )
     parser.add_argument(
         "--chunk-size",
         type=int,
@@ -177,12 +205,15 @@ def main():
     def do_play(*_args):
         """Play last recorded WAV file"""
         nonlocal last_wav_path
+        play_cmd_format = _PLAY_COMMANDS.get(args.play_command, args.play_command)
 
         print(last_wav_path)
         if last_wav_path and last_wav_path.is_file():
             threading.Thread(
                 target=lambda: subprocess.check_call(
-                    ["aplay", "-q", str(last_wav_path)]
+                    shlex.split(
+                        play_cmd_format.format(path=str(last_wav_path.absolute()))
+                    )
                 )
             ).start()
 
@@ -262,24 +293,29 @@ def recording_proc(args: argparse.Namespace):
     """Drops audio chunks until recording"""
     global _IS_RECORDING, _RECORDING_PATH, _RECORDING_DONE
     try:
-        arecord_cmd = [
-            "arecord",
-            "-q",
-            "-r",
-            str(_SAMPLE_RATE),
-            "-c",
-            str(_SAMPLE_CHANNELS),
-            "-f",
-            "S16_LE",
-        ]
+        record_cmd_format = _RECORD_COMMANDS.get(
+            args.record_command, args.record_command
+        )
 
-        if args.device:
-            arecord_cmd.extend(["-D", shlex.quote(args.device)])
+        record_cmd = shlex.split(
+            record_cmd_format.format(
+                rate=_SAMPLE_RATE,
+                width_bytes=_SAMPLE_WIDTH_BYTES,
+                width_bits=_SAMPLE_WIDTH_BITS,
+                channels=_SAMPLE_CHANNELS,
+                device=args.device,
+            )
+        )
 
-        _LOGGER.debug(arecord_cmd)
+        _LOGGER.debug(record_cmd)
+
+        record_env = {}
+        if args.device != "default":
+            # for sox
+            record_env["AUDIODEV"] = args.device
 
         # Start recording process
-        proc = subprocess.Popen(arecord_cmd, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(record_cmd, stdout=subprocess.PIPE, env=record_env)
         assert proc.stdout, "No stdout"
         record_wave_file = None
 
@@ -293,7 +329,7 @@ def recording_proc(args: argparse.Namespace):
 
                     record_wave_file = wave.open(str(_RECORDING_PATH), "w")
                     record_wave_file.setframerate(_SAMPLE_RATE)
-                    record_wave_file.setsampwidth(_SAMPLE_WIDTH)
+                    record_wave_file.setsampwidth(_SAMPLE_WIDTH_BYTES)
                     record_wave_file.setnchannels(_SAMPLE_CHANNELS)
 
                 record_wave_file.writeframes(chunk)
