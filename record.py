@@ -46,13 +46,13 @@ _SAMPLE_CHANNELS = 2
 # Overridden when not one of these names.
 _RECORD_COMMANDS = {
     "arecord": "arecord -q -r {rate} -f S16_LE -c {channels} -D '{device}' -t raw",
-    "sox": "rec -q -r {rate} -b {width_bits} -c {channels} -t raw -",
+    "sox": "/usr/local/bin/rec -q -r {rate} -b {width_bits} -c {channels} -t raw -",
 }
 
 # Format strings for common playback commands.
 # Referenced by name with --play-command argument.
 # Overridden when not one of these names.
-_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "play -q '{path}'"}
+_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "/usr/local/bin/play -q '{path}'"}
 
 # -----------------------------------------------------------------------------
 
