@@ -46,13 +46,13 @@ _SAMPLE_CHANNELS = 2
 # Overridden when not one of these names.
 _RECORD_COMMANDS = {
     "arecord": "arecord -q -r {rate} -f S16_LE -c {channels} -D '{device}' -t raw",
-    "sox": "rec -q -r {rate} -b {width_bits} -c {channels} -t raw -",
+    "sox": "/usr/local/bin/rec -q -r {rate} -b {width_bits} -c {channels} -t raw -",
 }
 
 # Format strings for common playback commands.
 # Referenced by name with --play-command argument.
 # Overridden when not one of these names.
-_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "play -q '{path}'"}
+_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "/usr/local/bin/play -q '{path}'"}
 
 # -----------------------------------------------------------------------------
 
@@ -168,14 +168,33 @@ def main():
     play_button = None
     next_button = None
 
+    # Define Tkinter styles
+    style = ttk.Style()
+    # Default button style (for next and playback buttons)
+    style.configure("TButton", font=("Courier", 20))
+    # Initial style for start/stop recording button
+    style.configure(
+        "record.TButton",
+        background="yellow",
+        activebackground="red",
+        font=("Courier", 20),
+    )
+    # Styles for various button states
+    style.configure("grey.TButton", background="#F0F0F0")
+    style.configure("yellow.TButton", background="yellow")
+    style.configure(
+        "greenactivered.TButton", background="green", activebackground="red"
+    )
+    style.configure("activewhite.TButton", activebackground="white")
+
     def do_next(*_args):
         """Get the next prompt and show text."""
         nonlocal current_prompt_id, last_wav_path
         current_prompt_id = None
         last_wav_path = None
 
-        next_button.config(bg="#F0F0F0")
-        record_button.config(bg="yellow")
+        next_button.config(style="grey.TButton")
+        record_button.config(style="yellow.TButton")
 
         if prompts_left:
             # Find first unfinished prompts
@@ -230,11 +249,11 @@ def main():
             _RECORDING_DONE.wait()
 
             window.config(background="#F0F0F0")
-            record_button.config(bg="green", activebackground="red")
+            record_button.config(style="greenactivered.TButton")
             record_button["text"] = "RECORD"
             play_button["state"] = tk.NORMAL
             next_button["state"] = tk.NORMAL
-            next_button.config(bg="yellow")
+            next_button.config(style="yellow.TButton")
 
             if current_prompt_id and last_wav_path:
                 # Write prompt text to file
@@ -244,10 +263,10 @@ def main():
             # Start recording
             if current_prompt_id:
                 window.config(background="red")
-                record_button.config(activebackground="white")
+                record_button.config(style="activewhite.TButton")
                 record_button["text"] = "FINISH"
                 play_button["state"] = tk.DISABLED
-                next_button.config(bg="#F0F0F0")
+                next_button.config(style="grey.TButton")
 
                 last_wav_path = (
                     wav_dir / f"{current_prompt_id}_{time.time()}"
@@ -267,18 +286,21 @@ def main():
     bottom_frame.pack(fill=tk.BOTH, padx=10, pady=10)
 
     # Start/stop recording button
-    record_button = tk.Button(bottom_frame, text="RECORD", command=do_record)
-    record_button.config(bg="yellow", activebackground="red", font=("Courier", 20))
+    record_button = ttk.Button(
+        bottom_frame, text="RECORD", command=do_record, style="record.TButton"
+    )
     record_button.pack(side="left", padx=10, pady=10)
 
     # Next prompt button
-    next_button = tk.Button(bottom_frame, text="Next", command=do_next)
-    next_button.config(font=("Courier", 20))
+    next_button = ttk.Button(
+        bottom_frame, text="Next", command=do_next, style="TButton"
+    )
     next_button.pack(side="right", padx=10, pady=10)
 
     # Play back last recording button
-    play_button = tk.Button(bottom_frame, text="Play", command=do_play)
-    play_button.config(font=("Courier", 20))
+    play_button = ttk.Button(
+        bottom_frame, text="Play", command=do_play, style="TButton"
+    )
     play_button.pack(side="right", padx=10, pady=10)
 
     do_next()
