@@ -342,7 +342,7 @@ def recording_proc(args: argparse.Namespace):
             record_env["AUDIODEV"] = args.device
 
         # Start recording process
-        proc = subprocess.Popen(record_cmd, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(record_cmd, stdout=subprocess.PIPE, env=record_env)
         assert proc.stdout, "No stdout"
         record_wave_file = None
 
