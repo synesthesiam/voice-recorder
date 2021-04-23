@@ -135,7 +135,7 @@ def main():
 
     # Remaining prompt ids
     prompts_left: typing.List[str] = list(prompts.keys())
-
+    prompts_left.reverse()
     # Total number of prompts
     total_prompts: int = len(prompts_left)
 
@@ -296,7 +296,6 @@ def main():
         bottom_frame, text="Next", command=do_next, style="TButton"
     )
     next_button.pack(side="right", padx=10, pady=10)
-
     # Play back last recording button
     play_button = ttk.Button(
         bottom_frame, text="Play", command=do_play, style="TButton"
@@ -305,6 +304,12 @@ def main():
 
     do_next()
 
+    window.bind('<Return>', do_record)
+    window.bind('a', do_record)
+    window.bind('q', do_record)
+    window.bind('z', do_play)
+    window.bind('w', do_play)
+    window.bind('e', do_next)
     window.mainloop()
 
 
