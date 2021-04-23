@@ -49,3 +49,9 @@ $ python3 verify.py <INPUT_DIR> <OUTPUT_DIR>
 where `<INPUT_DIR>` is the WAV file directory you recorded to and `<OUTPUT_DIR>` is where you'd like the trimmed/verified WAV files and prompts to be written.
 
 To use, left-click the waveform where the utterance starts and right-click where it ends. Click the Play button to listen to the trimmed audio, and Verify to save it. Click Skip to go to the next WAV file without saving.
+
+## Keyboard Shortcuts
+
+* `q` - record
+* `w` - play
+* `e` - next

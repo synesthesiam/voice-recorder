@@ -52,7 +52,10 @@ _RECORD_COMMANDS = {
 # Format strings for common playback commands.
 # Referenced by name with --play-command argument.
 # Overridden when not one of these names.
-_PLAY_COMMANDS = {"aplay": "aplay -q '{path}'", "sox": "/usr/local/bin/play -q '{path}'"}
+_PLAY_COMMANDS = {
+    "aplay": "aplay -q '{path}'",
+    "sox": "/usr/local/bin/play -q '{path}'",
+}
 
 # -----------------------------------------------------------------------------
 
@@ -304,12 +307,12 @@ def main():
 
     do_next()
 
-    window.bind('<Return>', do_record)
-    window.bind('a', do_record)
-    window.bind('q', do_record)
-    window.bind('z', do_play)
-    window.bind('w', do_play)
-    window.bind('e', do_next)
+    window.bind("<Return>", do_record)
+    window.bind("a", do_record)
+    window.bind("q", do_record)
+    window.bind("z", do_play)
+    window.bind("w", do_play)
+    window.bind("e", do_next)
     window.mainloop()
 
 
